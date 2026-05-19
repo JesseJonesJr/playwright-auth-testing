@@ -1,4 +1,5 @@
 # Auth UI Testing — Playwright + TypeScript
+[![Playwright Tests](https://github.com/JesseJonesJr/playwright-auth-testing/actions/workflows/playwright.yml/badge.svg)](https://github.com/JesseJonesJr/playwright-auth-testing/actions/workflows/playwright.yml)
 
 ## Overview
 
