@@ -113,6 +113,27 @@ npx playwright test --project=firefox
 
 ---
 
+## Continuous Integration
+
+This project uses **GitHub Actions** to automatically run the full Playwright test suite on every pull request to `main` and every push to `main`.
+
+### What runs in CI
+- Clones the application under test from its private repository into the runner using a least-privilege fine-grained PAT (read-only access, scoped to a single repository)
+- Boots the Next.js dev server on `localhost:3000` and waits for it to respond
+- Runs all 36 tests across Chromium and Firefox
+- Uploads the HTML report and raw failure artifacts (screenshots, videos, traces) for debugging
+- Retries failing tests up to 2 times in CI to absorb genuine flake, but never locally, so real bugs aren't masked during development
+
+### Why CI matters here
+The pipeline paid for itself on its first real run: it caught a "works on my machine" drift between my local app and the version committed to its repository. My local Next.js app had uncommitted UI changes (a renamed button on the password-reset success screen). Locally all 72 tests passed, but CI cloned only the committed code, where the button still had the old text. CI exposed the drift in minutes; pushing the uncommitted UI work fixed it.
+
+This is the textbook value of CI/CD: tests run against the *actual deployable code*, not a developer's local snapshot.
+
+### Workflow file
+See [`.github/workflows/playwright.yml`](.github/workflows/playwright.yml).
+
+---
+
 ## Test Plan
 
 The full test plan is documented in [TEST_PLAN.md](./TEST_PLAN.md) and includes:
