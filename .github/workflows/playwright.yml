@@ -24,11 +24,15 @@ jobs:
           token: ${{ secrets.APP_REPO_PAT }}
           path: app
 
-      # 3. Node.js setup (still needed for installing + running the app)
+      # 3. Node.js setup WITH npm caching (caches downloaded packages)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
 
       # 4. Install test dependencies
       - name: Install test dependencies
@@ -39,14 +43,34 @@ jobs:
         working-directory: ./app
         run: npm ci
 
-      # 6. Start app in background, wait for it to respond
+      # 6. Restore the Playwright image tarball from cache (if it exists)
+      - name: Cache Playwright image
+        id: playwright-image-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/playwright-image.tar
+          key: playwright-image-v1.59.1-noble
+
+      # 7. Load image from cache, or pull it fresh and save for next time
+      - name: Load or pull Playwright image
+        run: |
+          if [ -f /tmp/playwright-image.tar ]; then
+            echo "Cache hit. Loading image from tarball."
+            docker load -i /tmp/playwright-image.tar
+          else
+            echo "Cache miss. Pulling image and saving to tarball."
+            docker pull mcr.microsoft.com/playwright:v1.59.1-noble
+            docker save mcr.microsoft.com/playwright:v1.59.1-noble -o /tmp/playwright-image.tar
+          fi
+
+      # 8. Start app in background, wait for it to respond
       - name: Start app
         working-directory: ./app
         run: |
           npm run dev &
           npx wait-on http://localhost:3000 --timeout 90000
 
-      # 7. Run tests inside the Playwright Docker container
+      # 9. Run tests inside the Playwright Docker container
       - name: Run tests in Docker
         run: |
           docker run --rm \
@@ -57,7 +81,7 @@ jobs:
             mcr.microsoft.com/playwright:v1.59.1-noble \
             npx playwright test
 
-      # 8. Upload HTML report (even on failure)
+      # 10. Upload HTML report
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -66,7 +90,7 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-      # 9. Upload raw test artifacts as backup
+      # 11. Upload raw test artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
