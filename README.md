@@ -120,7 +120,7 @@ This project uses **GitHub Actions** to automatically run the full Playwright te
 ### What runs in CI
 - Clones the application under test from its private repository into the runner using a least-privilege fine-grained PAT (read-only access, scoped to a single repository)
 - Boots the Next.js dev server on `localhost:3000` and waits for it to respond
-- Runs all 36 tests across Chromium and Firefox
+- Runs the full Playwright suite (Chromium + Firefox) inside Microsoft's official Playwright Docker container for environment consistency between local runs and CI
 - Uploads the HTML report and raw failure artifacts (screenshots, videos, traces) for debugging
 - Retries failing tests up to 2 times in CI to absorb genuine flake, but never locally, so real bugs aren't masked during development
 
@@ -128,6 +128,23 @@ This project uses **GitHub Actions** to automatically run the full Playwright te
 The pipeline paid for itself on its first real run: it caught a "works on my machine" drift between my local app and the version committed to its repository. My local Next.js app had uncommitted UI changes (a renamed button on the password-reset success screen). Locally all 72 tests passed, but CI cloned only the committed code, where the button still had the old text. CI exposed the drift in minutes; pushing the uncommitted UI work fixed it.
 
 This is the textbook value of CI/CD: tests run against the *actual deployable code*, not a developer's local snapshot.
+
+### Containerization
+
+Tests run inside the official **`mcr.microsoft.com/playwright`** Docker image, pulled at job time and torn down with `--rm`. This eliminates the install-browsers step from CI and guarantees the test environment is identical to what runs locally.
+
+The image is pinned to the project's exact Playwright version, so browsers in the container are compatible with the Playwright npm package used by the test code.
+
+#### Measured caching trade-offs
+
+Two caching strategies were tested in CI:
+
+| Cache | Result | Decision |
+| --- | --- | --- |
+| **npm cache** (`actions/setup-node` with `cache: 'npm'`) | Consistent small improvement | **Kept** |
+| **Docker image tarball cache** (`actions/cache` + `docker save`/`docker load`) | No measurable benefit. The cached run took 2m 14s vs 2m 11s uncached. Restoring a 1.5GB tarball from GitHub's cache takes about as long as pulling fresh from Microsoft's CDN. | **Removed** |
+
+Final CI runtime: roughly **2 minutes**, down from a pre-Docker baseline of ~2m 30s.
 
 ### Workflow file
 See [`.github/workflows/playwright.yml`](.github/workflows/playwright.yml).
